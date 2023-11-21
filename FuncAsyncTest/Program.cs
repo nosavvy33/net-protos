@@ -6,14 +6,18 @@
         {
             var integerList = new[] { 1, 2, 3 };
 
-            var listOfTasks = integerList
-                .Select(x =>
-                    new KeyValuePair<int, Task<string>>
-                        (x, StringConvertAsync(x))
-                )
-                .ToList();
+            var listOfTasks =  new List<(int,Task<string>)>();
 
-            var results = await listOfTasks.FlattenTasksAsync((key, taskResult) => new { Key = key, Result = taskResult });
+            listOfTasks.AddRange(
+                integerList
+                    .Select(x => (x, StringConvertAsync(x)))
+                    .ToList()
+                );
+
+            var results = await listOfTasks
+                .FlattenTasksAsync(
+                    (key, taskResult) => new { Key = key, Result = taskResult }
+                    );
 
             foreach (var result in results)
             {
@@ -27,16 +31,16 @@
 
     public static class TaskExtensionsLast
     {
-        public static async Task<List<TResult>> FlattenTasksAsync<TKey, TTaskResult, TResult>
+        public static async Task<IEnumerable<TResult>> FlattenTasksAsync<TKey, TTaskResult, TResult>
             (
-            this IEnumerable<KeyValuePair<TKey, Task<TTaskResult>>> taskList,
+            this IEnumerable<(TKey, Task<TTaskResult>)> taskList,
             Func<TKey, TTaskResult, TResult> resultSelector
             )
         {
-            await Task.WhenAll(taskList.Select(kv => kv.Value));
+            await Task.WhenAll(taskList.Select(kv => kv.Item2));
 
             return taskList.Select(kv =>
-                   resultSelector(kv.Key, kv.Value.Result)).ToList();
+                   resultSelector(kv.Item1, kv.Item2.Result));
         }
     }
 }
